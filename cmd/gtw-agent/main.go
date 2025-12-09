@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"crypto/tls"
 )
 
 const version = "v1.1.0"
