@@ -1,0 +1,11 @@
+{
+    "name": "gtw-agent",
+    "version": "1.0.0",
+    "description": "Uverus Gateway Agent",
+    "scripts": {
+        "prepare": "husky"
+    },
+    "devDependencies": {
+        "husky": "^9.0.0"
+    }
+}

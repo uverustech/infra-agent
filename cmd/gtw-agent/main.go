@@ -20,7 +20,7 @@ import (
 	"github.com/nxadm/tail"
 )
 
-const version = "v1.1.3"
+const version = "v1.2.0"
 
 var (
 	nodeID      string
