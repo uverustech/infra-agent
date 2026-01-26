@@ -20,7 +20,7 @@ import (
 	"github.com/nxadm/tail"
 )
 
-const version = "v1.3.0"
+const version = "v1.3.1"
 
 var (
 	nodeID      string
@@ -32,6 +32,7 @@ var (
 	// CLI flags
 	showVersion = flag.Bool("version", false, "Show current and latest agent version")
 	forceUpdate = flag.Bool("update", false, "Force immediate self-update to latest release")
+	verbose     = flag.Bool("verbose", false, "Show detailed debug information")
 )
 
 func main() {
@@ -197,6 +198,8 @@ func sendHeartbeat() {
 					log.Printf("[update] error: %v", err)
 				}
 			}()
+		} else if *verbose {
+			log.Printf("[update] no update needed or version check failed (latest: %s, current: %s)", v.Version, version)
 		}
 	}
 	resp.Body.Close()
@@ -207,31 +210,52 @@ func selfUpdate(tag string) error {
 		return fmt.Errorf("could not determine executable path: %w", err)
 	}
 
-	url := fmt.Sprintf("https://github.com/uverustech/gtw-agent/releases/download/%s/gtw-agent-linux-amd64", tag)
-	log.Printf("[update] downloading from %s", url)
+	if *verbose {
+		log.Printf("[update] current executable: %s", exe)
+	}
+
+	url := fmt.Sprintf("https://github.com/uverustech/gtw-agent/releases/download/v%s/gtw-agent-linux-amd64", tag)
+	if *verbose {
+		log.Printf("[update] downloading from: %s", url)
+	}
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return err
+		return fmt.Errorf("http get failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if *verbose {
+		log.Printf("[update] response status: %s", resp.Status)
+		for k, v := range resp.Header {
+			log.Printf("[update] header %s: %v", k, v)
+		}
+	}
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
 	}
 
 	tmp := exe + ".NEW"
+	if *verbose {
+		log.Printf("[update] creating temp file: %s", tmp)
+	}
 	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create temp file %s: %w", tmp, err)
 	}
 
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	n, err := io.Copy(f, resp.Body)
+	if err != nil {
 		f.Close()
 		os.Remove(tmp)
 		return fmt.Errorf("failed to copy download to %s: %w", tmp, err)
 	}
 	f.Close()
+
+	if *verbose {
+		log.Printf("[update] downloaded %d bytes to %s", n, tmp)
+	}
 
 	if err := os.Rename(tmp, exe); err != nil {
 		os.Remove(tmp)
@@ -242,8 +266,12 @@ func selfUpdate(tag string) error {
 	// Non-blocking restart
 	go func() {
 		time.Sleep(500 * time.Millisecond) // Give log time to flush
-		if err := exec.Command("sudo", "systemctl", "restart", "gtw-agent").Run(); err != nil {
-			log.Printf("[update] failed to restart service: %v", err)
+		cmd := exec.Command("sudo", "systemctl", "restart", "gtw-agent")
+		if *verbose {
+			log.Printf("[update] executing: %s %v", cmd.Path, cmd.Args)
+		}
+		if out, err := cmd.CombinedOutput(); err != nil {
+			log.Printf("[update] failed to restart service: %v. Output: %s", err, string(out))
 		}
 	}()
 	return nil
