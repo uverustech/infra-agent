@@ -2,17 +2,22 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
-	"time"
-	"fmt"
-	"io"
+	"path/filepath"
 	"strings"
-	"crypto/tls"
+	"sync"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/nxadm/tail"
 )
 
 const version = "v1.1.2"
@@ -23,7 +28,7 @@ var (
 	caddyfile   = "/etc/caddy/Caddyfile"
 	controlURL  = "https://control.gtw.uvrs.xyz" // control dashboard
 	heartbeatOK = false
-	
+
 	// CLI flags
 	showVersion = flag.Bool("version", false, "Show current and latest agent version")
 	forceUpdate = flag.Bool("update", false, "Force immediate self-update to latest release")
@@ -50,12 +55,83 @@ func main() {
 	gitPull()
 	validateAndReload()
 
+	// Start log streaming in background
+	go streamLogs()
+
 	ticker := time.NewTicker(10 * time.Second)
 	for range ticker.C {
 		gitPull()
 		validateAndReload()
 		sendHeartbeat()
 	}
+}
+
+func streamLogs() {
+	logFile := "/var/log/caddy/access.log"
+
+	// Create the log file if it doesn't exist to avoid tail error
+	if _, err := os.Stat(logFile); os.IsNotExist(err) {
+		os.MkdirAll(filepath.Dir(logFile), 0755)
+		os.WriteFile(logFile, []byte(""), 0644)
+	}
+
+	t, err := tail.TailFile(logFile, tail.Config{
+		Follow:    true,
+		ReOpen:    true,
+		MustExist: false,
+		Poll:      true, // Useful for some filesystems
+	})
+	if err != nil {
+		log.Printf("[logs] failed to tail %s: %v", logFile, err)
+		return
+	}
+
+	for line := range t.Lines {
+		if line.Text == "" {
+			continue
+		}
+		// Effortless batching could be added here, but for now we stream per line
+		sendToControl(line.Text)
+	}
+}
+
+var (
+	wsConn *websocket.Conn
+	wsMu   sync.Mutex
+)
+
+func sendToControl(logLine string) {
+	wsMu.Lock()
+	defer wsMu.Unlock()
+
+	if wsConn == nil {
+		if err := connectWS(); err != nil {
+			return
+		}
+	}
+
+	err := wsConn.WriteMessage(websocket.TextMessage, []byte(logLine))
+	if err != nil {
+		log.Printf("[logs] ws write error: %v, reconnecting...", err)
+		wsConn.Close()
+		wsConn = nil
+	}
+}
+
+func connectWS() error {
+	u := strings.Replace(controlURL, "https://", "wss://", 1) + "/api/logs/stream"
+	header := http.Header{}
+	header.Add("X-Node-ID", nodeID)
+
+	dialer := websocket.DefaultDialer
+	conn, _, err := dialer.Dial(u, header)
+	if err != nil {
+		// Silent fail, will retry on next log line
+		return err
+	}
+	log.Printf("[logs] connected to control plane: %s", u)
+	wsConn = conn
+	return nil
 }
 
 func gitPull() {
@@ -93,12 +169,12 @@ func validateAndReload() {
 func sendHeartbeat() {
 	sha, _ := exec.Command("git", "-C", configDir, "rev-parse", "HEAD").Output()
 	payload := map[string]interface{}{
-		"node_id":         nodeID,
-		"git_sha":         string(bytes.TrimSpace(sha)),
-		"agent_version":   version,
-		"caddy_version":   getCaddyVersion(),
-		"last_reload_ok":  heartbeatOK,
-		"timestamp":       time.Now().UTC().Format(time.RFC3339),
+		"node_id":        nodeID,
+		"git_sha":        string(bytes.TrimSpace(sha)),
+		"agent_version":  version,
+		"caddy_version":  getCaddyVersion(),
+		"last_reload_ok": heartbeatOK,
+		"timestamp":      time.Now().UTC().Format(time.RFC3339),
 	}
 	jsonBody, _ := json.Marshal(payload)
 
@@ -110,7 +186,9 @@ func sendHeartbeat() {
 	if err != nil {
 		log.Printf("[update] check failed: %v", err)
 	} else if resp.StatusCode == 200 {
-		var v struct{ Version string `json:"version"` }
+		var v struct {
+			Version string `json:"version"`
+		}
 		if json.NewDecoder(resp.Body).Decode(&v) == nil && v.Version != "" && v.Version != version {
 			log.Printf("Updating gtw-agent %s → %s", version, v.Version)
 			tag := strings.TrimPrefix(v.Version, "v")
@@ -209,6 +287,7 @@ func printVersionAndExit() {
 	}
 	os.Exit(0)
 }
+
 // forceSelfUpdateAndExit triggers update immediately and restarts the service
 func forceSelfUpdateAndExit() {
 	latest, err := getLatestAgentVersion()
@@ -229,4 +308,3 @@ func forceSelfUpdateAndExit() {
 	// selfUpdate already restarts via systemctl — we never return
 	os.Exit(0)
 }
-
