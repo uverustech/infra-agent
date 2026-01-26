@@ -71,17 +71,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 5. Amend commit
-	// We use --no-verify to skip triggers if any, though post-commit doesn't trigger itself.
-	// We use --no-edit to keep the original message but we prefix with "bump: " to be explicit if we want,
-	// but the user asked "without creating a new commit" and "use the existing/intended commit".
-	// To strictly follow "use the existing commit", we just add the file and amend --no-edit.
-
 	exec.Command("git", "add", mainFile).Run()
 	// We use env var to prevent recursion if the user had a pre-commit check
 	cmd := exec.Command("git", "commit", "--amend", "--no-edit", "--no-verify")
 	cmd.Env = append(os.Environ(), "SKIP_BUMP=1")
-	cmd.Run()
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Error amending commit: %v\n", err)
+		os.Exit(1)
+	}
 
-	fmt.Println("Version updated and commit amended.")
+	// 6. Create Tag
+	tagCmd := exec.Command("git", "tag", "-a", newVersion, "-m", "Release "+newVersion)
+	if err := tagCmd.Run(); err != nil {
+		fmt.Printf("Error creating tag %s: %v\n", newVersion, err)
+		// Don't exit here, maybe just skip push
+	} else {
+		fmt.Printf("Created tag %s\n", newVersion)
+	}
+
+	// 7. Push everything
+	// We push the current branch and the tags
+	fmt.Println("Pushing commit and tags to origin...")
+	pushCmd := exec.Command("git", "push", "origin", "HEAD", "--tags")
+	if out, err := pushCmd.CombinedOutput(); err != nil {
+		fmt.Printf("Error pushing: %v\n%s\n", err, string(out))
+		os.Exit(1)
+	}
+
+	fmt.Println("Version updated, commit amended, tag created, and pushed to origin.")
 }
