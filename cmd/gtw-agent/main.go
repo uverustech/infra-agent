@@ -20,7 +20,7 @@ import (
 	"github.com/nxadm/tail"
 )
 
-const version = "v1.1.2"
+const version = "v1.1.3"
 
 var (
 	nodeID      string
@@ -190,43 +190,62 @@ func sendHeartbeat() {
 			Version string `json:"version"`
 		}
 		if json.NewDecoder(resp.Body).Decode(&v) == nil && v.Version != "" && v.Version != version {
-			log.Printf("Updating gtw-agent %s → %s", version, v.Version)
 			tag := strings.TrimPrefix(v.Version, "v")
-			go selfUpdate(tag)
+			log.Printf("[update] triggering update %s → %s", version, v.Version)
+			go func() {
+				if err := selfUpdate(tag); err != nil {
+					log.Printf("[update] error: %v", err)
+				}
+			}()
 		}
 	}
 	resp.Body.Close()
 }
 func selfUpdate(tag string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("could not determine executable path: %w", err)
+	}
+
 	url := fmt.Sprintf("https://github.com/uverustech/gtw-agent/releases/download/%s/gtw-agent-linux-amd64", tag)
+	log.Printf("[update] downloading from %s", url)
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != 200 {
-		resp.Body.Close()
-		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
-	}
 	defer resp.Body.Close()
 
-	tmp := "/usr/local/bin/gtw-agent.NEW"
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
+	}
+
+	tmp := exe + ".NEW"
 	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create temp file %s: %w", tmp, err)
 	}
+
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		f.Close()
-		return err
+		os.Remove(tmp)
+		return fmt.Errorf("failed to copy download to %s: %w", tmp, err)
 	}
 	f.Close()
 
-	if err := os.Rename(tmp, "/usr/local/bin/gtw-agent"); err != nil {
-		return err
+	if err := os.Rename(tmp, exe); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("failed to replace binary %s with %s: %w", exe, tmp, err)
 	}
 
-	log.Printf("Successfully updated to %s → restarting via systemd", tag)
+	log.Printf("[update] successfully replaced binary → restarting via systemd")
 	// Non-blocking restart
-	go exec.Command("systemctl", "restart", "gtw-agent").Run()
+	go func() {
+		time.Sleep(500 * time.Millisecond) // Give log time to flush
+		if err := exec.Command("sudo", "systemctl", "restart", "gtw-agent").Run(); err != nil {
+			log.Printf("[update] failed to restart service: %v", err)
+		}
+	}()
 	return nil
 }
 
