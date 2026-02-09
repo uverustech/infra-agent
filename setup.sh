@@ -63,6 +63,10 @@ echo "Installing infra-agent binary..."
 curl -sSfL "$RELEASE_URL" -o /usr/local/bin/infra-agent.NEW
 chmod +x /usr/local/bin/infra-agent.NEW
 mv /usr/local/bin/infra-agent.NEW /usr/local/bin/infra-agent
+
+echo "Running system setup..."
+/usr/local/bin/infra-agent --setup -y || echo "Warning: System setup failed"
+
 systemctl restart infra-agent || true
 
 echo "Creating systemd service..."
