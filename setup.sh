@@ -5,7 +5,7 @@ echo "=== Uverus Infra Agent Installer ==="
 echo "Detecting system..."
 
 # Variables — change only these lines if needed
-CONFIG_REPO="git@github.com:uverustech/uvrs-infra-config.git"
+CONFIG_REPO="git@github.com:uverustech/gtw-config.git"
 RELEASE_URL="https://github.com/uverustech/infra-agent/releases/latest/download/infra-agent-linux-amd64"
 
 if [[ -z "$NODE_ID" ]]; then
