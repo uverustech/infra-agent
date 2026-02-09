@@ -20,7 +20,7 @@ import (
 	"github.com/nxadm/tail"
 )
 
-const version = "v1.5.4"
+const version = "v1.6.0"
 
 var (
 	nodeID      string
@@ -29,6 +29,7 @@ var (
 	caddyfile   = "/etc/caddy/Caddyfile"
 	controlURL  = "https://control.uvrs.xyz" // control dashboard
 	heartbeatOK = false
+	lastError   string
 
 	// CLI flags
 	showVersion = flag.Bool("version", false, "Show current and latest agent version")
@@ -169,16 +170,23 @@ func gitPull() {
 }
 
 func validateAndReload() {
-	if err := exec.Command("caddy", "validate", "--config", caddyfile).Run(); err != nil {
-		log.Printf("Validation failed: %v", err)
+	lastError = ""
+	out, err := exec.Command("caddy", "validate", "--config", caddyfile).CombinedOutput()
+	if err != nil {
+		log.Printf("Validation failed: %v\n%s", err, string(out))
+		lastError = string(out)
 		heartbeatOK = false
 		return
 	}
-	if err := exec.Command("caddy", "reload", "--config", caddyfile).Run(); err != nil {
-		log.Printf("Reload failed: %v", err)
+
+	out, err = exec.Command("caddy", "reload", "--config", caddyfile).CombinedOutput()
+	if err != nil {
+		log.Printf("Reload failed: %v\n%s", err, string(out))
+		lastError = string(out)
 		heartbeatOK = false
 		return
 	}
+
 	log.Println("Caddy reloaded successfully")
 	heartbeatOK = true
 }
@@ -191,6 +199,7 @@ func sendHeartbeat() {
 		"agent_version":  version,
 		"caddy_version":  getCaddyVersion(),
 		"last_reload_ok": heartbeatOK,
+		"last_error":     lastError,
 		"node_type":      nodeType,
 		"timestamp":      time.Now().UTC().Format(time.RFC3339),
 	}
