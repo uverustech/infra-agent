@@ -20,7 +20,7 @@ import (
 	"github.com/nxadm/tail"
 )
 
-const version = "v1.5.2"
+const version = "v1.5.3"
 
 var (
 	nodeID      string
@@ -65,16 +65,20 @@ func main() {
 
 	log.Printf("infra-agent %s starting — node: %s", version, nodeID)
 
-	gitPull()
-	validateAndReload()
+	if nodeType == "gateway" {
+		gitPull()
+		validateAndReload()
+	}
 
 	// Start log streaming in background
 	go streamLogs()
 
 	ticker := time.NewTicker(10 * time.Second)
 	for range ticker.C {
-		gitPull()
-		validateAndReload()
+		if nodeType == "gateway" {
+			gitPull()
+			validateAndReload()
+		}
 		sendHeartbeat()
 	}
 }
