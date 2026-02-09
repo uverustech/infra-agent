@@ -20,7 +20,7 @@ import (
 	"github.com/nxadm/tail"
 )
 
-const version = "v1.6.0"
+const version = "v1.6.1"
 
 var (
 	nodeID      string
@@ -472,8 +472,9 @@ func fetchGithubFile(urlStr, token string) (string, error) {
 		return "", err
 	}
 
-	req.Header.Set("Authorization", "token "+token)
-	req.Header.Set("Accept", "application/vnd.github.v3.raw")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github.raw+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
