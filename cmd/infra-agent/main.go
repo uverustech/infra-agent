@@ -24,6 +24,7 @@ const version = "v1.3.2"
 
 var (
 	nodeID      string
+	nodeType    string
 	configDir   = "/etc/caddy"
 	caddyfile   = "/etc/caddy/Caddyfile"
 	controlURL  = "https://control.uvrs.xyz" // control dashboard
@@ -37,6 +38,7 @@ var (
 
 func main() {
 	flag.StringVar(&nodeID, "node-id", os.Getenv("NODE_ID"), "Node ID (e.g. svr-gtw-nd1.uvrs.xyz)")
+	flag.StringVar(&nodeType, "node-type", os.Getenv("NODE_TYPE"), "Node Type (e.g. gateway, server)")
 	flag.Parse()
 
 	// Handle --version and --update early — before any long-running logic
@@ -175,6 +177,7 @@ func sendHeartbeat() {
 		"agent_version":  version,
 		"caddy_version":  getCaddyVersion(),
 		"last_reload_ok": heartbeatOK,
+		"node_type":      nodeType,
 		"timestamp":      time.Now().UTC().Format(time.RFC3339),
 	}
 	jsonBody, _ := json.Marshal(payload)

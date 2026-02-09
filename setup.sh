@@ -4,10 +4,37 @@ set -e
 echo "=== Uverus Infra Agent Installer ==="
 echo "Detecting system..."
 
-# Variables — change only these two lines if needed
-CONFIG_REPO="git@github.com:uverustech/gtw-config.git"
-NODE_ID="${NODE_ID:-$(hostname -f)}"
+# Variables — change only these lines if needed
+CONFIG_REPO="git@github.com:uverustech/uvrs-infra-config.git"
 RELEASE_URL="https://github.com/uverustech/infra-agent/releases/latest/download/infra-agent-linux-amd64"
+
+if [[ -z "$NODE_ID" ]]; then
+  read -p "Enter Node ID (e.g. svr-gtw-nd1.uvrs.xyz) [$(hostname -f)]: " input_id
+  NODE_ID="${input_id:-$(hostname -f)}"
+fi
+
+if [[ -z "$NODE_TYPE" ]]; then
+  echo "Select Node Type:"
+  echo "1) gateway"
+  echo "2) server:build"
+  echo "3) server:applications"
+  echo "4) server:banking"
+  echo "5) server (default)"
+  echo "6) service:analytics"
+  echo "7) custom"
+  read -p "Choice [1-7]: " type_choice
+
+  case $type_choice in
+    1) NODE_TYPE="gateway" ;;
+    2) NODE_TYPE="server:build" ;;
+    3) NODE_TYPE="server:applications" ;;
+    4) NODE_TYPE="server:banking" ;;
+    5|"") NODE_TYPE="server" ;;
+    6) NODE_TYPE="service:analytics" ;;
+    7) read -p "Enter custom node type: " custom_type; NODE_TYPE="$custom_type" ;;
+    *) NODE_TYPE="server" ;;
+  esac
+fi
 
 if [[ -z "$NODE_ID" || "$NODE_ID" == "localhost" ]]; then
   echo "Error: Cannot detect proper hostname. Set NODE_ID manually."
@@ -15,9 +42,9 @@ if [[ -z "$NODE_ID" || "$NODE_ID" == "localhost" ]]; then
   exit 1
 fi
 
-echo "Node will register as: $NODE_ID"
+echo "Node will register as: $NODE_ID (Type: $NODE_TYPE)"
 echo "Config repo: $CONFIG_REPO"
-sleep 3
+sleep 2
 
 echo "Updating system & installing dependencies..."
 export DEBIAN_FRONTEND=noninteractive
@@ -47,6 +74,7 @@ After=network.target
 [Service]
 Type=simple
 Environment="NODE_ID=$NODE_ID"
+Environment="NODE_TYPE=$NODE_TYPE"
 ExecStart=/usr/local/bin/infra-agent
 Restart=always
 RestartSec=5
