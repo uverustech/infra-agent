@@ -1,4 +1,4 @@
-module github.com/uverustech/gtw-agent
+module github.com/uverustech/infra-agent
 
 go 1.23
 

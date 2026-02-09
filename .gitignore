@@ -4,7 +4,7 @@
 # Ignore build outputs
 /bin/
 /build/
-gtw-agent
-gtw-agent-linux-*
-gtw-agent-darwin-*
-gtw-agent-windows-*
+infra-agent
+infra-agent-linux-*
+infra-agent-darwin-*
+infra-agent-windows-*

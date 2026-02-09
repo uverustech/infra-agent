@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
 
-echo "=== Uverus Gateway Agent Installer ==="
+echo "=== Uverus Infra Agent Installer ==="
 echo "Detecting system..."
 
 # Variables — change only these two lines if needed
 CONFIG_REPO="git@github.com:uverustech/gtw-config.git"
 NODE_ID="${NODE_ID:-$(hostname -f)}"
-RELEASE_URL="https://github.com/uverustech/gtw-agent/releases/latest/download/gtw-agent-linux-amd64"
+RELEASE_URL="https://github.com/uverustech/infra-agent/releases/latest/download/infra-agent-linux-amd64"
 
 if [[ -z "$NODE_ID" || "$NODE_ID" == "localhost" ]]; then
   echo "Error: Cannot detect proper hostname. Set NODE_ID manually."
@@ -32,22 +32,22 @@ cd /etc/caddy
 echo "Cloning config repo..."
 git clone $CONFIG_REPO . || { echo "Failed to clone repo. Check SSH key!"; exit 1; }
 
-echo "Installing gtw-agent binary..."
-curl -sSfL "$RELEASE_URL" -o /usr/local/bin/gtw-agent.NEW
-chmod +x /usr/local/bin/gtw-agent.NEW
-mv /usr/local/bin/gtw-agent.NEW /usr/local/bin/gtw-agent
-systemctl restart gtw-agent || true
+echo "Installing infra-agent binary..."
+curl -sSfL "$RELEASE_URL" -o /usr/local/bin/infra-agent.NEW
+chmod +x /usr/local/bin/infra-agent.NEW
+mv /usr/local/bin/infra-agent.NEW /usr/local/bin/infra-agent
+systemctl restart infra-agent || true
 
 echo "Creating systemd service..."
-cat > /etc/systemd/system/gtw-agent.service <<SERVICE
+cat > /etc/systemd/system/infra-agent.service <<SERVICE
 [Unit]
-Description=Uverus Gateway Agent
+Description=Uverus Infra Agent
 After=network.target
 
 [Service]
 Type=simple
 Environment="NODE_ID=$NODE_ID"
-ExecStart=/usr/local/bin/gtw-agent
+ExecStart=/usr/local/bin/infra-agent
 Restart=always
 RestartSec=5
 LimitNOFILE=1048576
@@ -57,7 +57,7 @@ WantedBy=multi-user.target
 SERVICE
 
 systemctl daemon-reload
-systemctl enable --now gtw-agent
+systemctl enable --now infra-agent
 
 echo "Reloading Caddy with your config..."
 caddy reload --config /etc/caddy/Caddyfile || echo "Warning: Caddy reload failed (will retry automatically)"

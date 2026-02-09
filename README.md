@@ -1,4 +1,4 @@
-# Uverus Gateway Agent (`gtw-agent`)
+# Uverus Gateway Agent (`infra-agent`)
 
 Runs on every gateway node:  
 `svr-gtw-nd1.uvrs.xyz`, `svr-gtw-nd2.uvrs.xyz`, `svr-gtw-nd3.uvrs.xyz`, …
@@ -7,13 +7,13 @@ Runs on every gateway node:
 
 ```bash
 # Auto-detects hostname (recommended)
-curl -sSfL https://raw.githubusercontent.com/uverustech/gtw-agent/main/setup.sh | bash
+curl -sSfL https://raw.githubusercontent.com/uverustech/infra-agent/main/setup.sh | bash
 ```
 
 Or force a specific node name
 
 ```bash
-NODE_ID=svr-gtw-nd1.uvrs.xyz curl -sSfL https://raw.githubusercontent.com/uverustech/gtw-agent/main/setup.sh | bash
+NODE_ID=svr-gtw-nd1.uvrs.xyz curl -sSfL https://raw.githubusercontent.com/uverustech/infra-agent/main/setup.sh | bash
 ```
 
 ## What happens when you run it
@@ -22,7 +22,7 @@ NODE_ID=svr-gtw-nd1.uvrs.xyz curl -sSfL https://raw.githubusercontent.com/uverus
 
 - Clones `github.com/uverustech/gtw-config` repo into `/etc/caddy`
 
-- Downloads the pre-built gtw-agent binary from GitHub Releases
+- Downloads the pre-built infra-agent binary from GitHub Releases
 
 - Starts systemd service that:
     - Auto-pulls config changes every 10 s

@@ -20,13 +20,13 @@ import (
 	"github.com/nxadm/tail"
 )
 
-const version = "v1.3.1"
+const version = "v1.3.2"
 
 var (
 	nodeID      string
 	configDir   = "/etc/caddy"
 	caddyfile   = "/etc/caddy/Caddyfile"
-	controlURL  = "https://control.gtw.uvrs.xyz" // control dashboard
+	controlURL  = "https://control.uvrs.xyz" // control dashboard
 	heartbeatOK = false
 
 	// CLI flags
@@ -51,7 +51,7 @@ func main() {
 		log.Fatal("NODE_ID not set. Use --node-id or NODE_ID env var")
 	}
 
-	log.Printf("gtw-agent %s starting — node: %s", version, nodeID)
+	log.Printf("infra-agent %s starting — node: %s", version, nodeID)
 
 	gitPull()
 	validateAndReload()
@@ -183,7 +183,7 @@ func sendHeartbeat() {
 	http.Post(controlURL+"/api/heartbeat", "application/json", bytes.NewReader(jsonBody))
 
 	// After sending heartbeat, ask the control plane if we are outdated
-	resp, err := http.Get("https://control.gtw.uvrs.xyz/api/agent/latest-version")
+	resp, err := http.Get("https://control.uvrs.xyz/api/agent/latest-version")
 	if err != nil {
 		log.Printf("[update] check failed: %v", err)
 	} else if resp.StatusCode == 200 {
@@ -214,7 +214,7 @@ func selfUpdate(tag string) error {
 		log.Printf("[update] current executable: %s", exe)
 	}
 
-	url := fmt.Sprintf("https://github.com/uverustech/gtw-agent/releases/download/v%s/gtw-agent-linux-amd64", tag)
+	url := fmt.Sprintf("https://github.com/uverustech/infra-agent/releases/download/v%s/infra-agent-linux-amd64", tag)
 	if *verbose {
 		log.Printf("[update] downloading from: %s", url)
 	}
@@ -266,7 +266,7 @@ func selfUpdate(tag string) error {
 	// Non-blocking restart
 	go func() {
 		time.Sleep(500 * time.Millisecond) // Give log time to flush
-		cmd := exec.Command("sudo", "systemctl", "restart", "gtw-agent")
+		cmd := exec.Command("sudo", "systemctl", "restart", "infra-agent")
 		if *verbose {
 			log.Printf("[update] executing: %s %v", cmd.Path, cmd.Args)
 		}
@@ -292,7 +292,7 @@ func getLatestAgentVersion() (string, error) {
 	}
 
 	req, _ := http.NewRequest("GET", controlURL+"/api/agent/latest-version", nil)
-	req.Header.Set("User-Agent", "gtw-agent/"+version)
+	req.Header.Set("User-Agent", "infra-agent/"+version)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -320,15 +320,15 @@ func getLatestAgentVersion() (string, error) {
 func printVersionAndExit() {
 	latest, err := getLatestAgentVersion()
 	if err != nil {
-		fmt.Printf("gtw-agent %s (latest: error fetching – %v)\n", version, err)
+		fmt.Printf("infra-agent %s (latest: error fetching – %v)\n", version, err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("gtw-agent current:  %s\n", version)
-	fmt.Printf("gtw-agent latest:   %s\n", latest)
+	fmt.Printf("infra-agent current:  %s\n", version)
+	fmt.Printf("infra-agent latest:   %s\n", latest)
 
 	if latest != version {
-		fmt.Printf("↑ Update available! Run: gtw-agent --update\n")
+		fmt.Printf("↑ Update available! Run: infra-agent --update\n")
 	} else {
 		fmt.Println("You are running the latest version")
 	}
@@ -346,7 +346,7 @@ func forceSelfUpdateAndExit() {
 		os.Exit(0)
 	}
 
-	fmt.Printf("Updating gtw-agent %s → %s ...\n", version, latest)
+	fmt.Printf("Updating infra-agent %s → %s ...\n", version, latest)
 	tag := strings.TrimPrefix(latest, "v")
 
 	if err := selfUpdate(tag); err != nil {

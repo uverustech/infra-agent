@@ -1,7 +1,7 @@
 {
-    "name": "gtw-agent",
+    "name": "infra-agent",
     "version": "1.0.0",
-    "description": "Uverus Gateway Agent",
+    "description": "Uverus Infra Agent",
     "scripts": {
         "prepare": "husky"
     },
