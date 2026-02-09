@@ -20,7 +20,7 @@ import (
 	"github.com/nxadm/tail"
 )
 
-const version = "v1.5.3"
+const version = "v1.5.4"
 
 var (
 	nodeID      string
@@ -39,7 +39,7 @@ var (
 	runSetup      = flag.Bool("setup", false, "Run system setup (e.g. install SSH keys)")
 	autoConfirm   = flag.Bool("y", false, "Auto-confirm all actions during setup")
 	githubToken   = flag.String("github-token", os.Getenv("GITHUB_TOKEN"), "GitHub token for private repo access (defaults to GITHUB_TOKEN env var)")
-	sshKeyRepoUrl = flag.String("ssh-key-url", "https://github.com/secrets/ssh-keys/uvr-ops/uvr_ops.pub", "URL to the SSH public key")
+	sshKeyRepoUrl = flag.String("ssh-key-url", "https://github.com/uverustech/secrets/ssh-keys/uvr-ops/uvr_ops.pub", "URL to the SSH public key")
 )
 
 func main() {
