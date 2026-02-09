@@ -4,7 +4,6 @@
 # Ignore build outputs
 /bin/
 /build/
-infra-agent
 infra-agent-linux-*
 infra-agent-darwin-*
 infra-agent-windows-*
