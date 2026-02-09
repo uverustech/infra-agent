@@ -9,7 +9,7 @@ CONFIG_REPO="git@github.com:uverustech/gtw-config.git"
 RELEASE_URL="https://github.com/uverustech/infra-agent/releases/latest/download/infra-agent-linux-amd64"
 
 if [[ -z "$NODE_ID" ]]; then
-  read -p "Enter Node ID (e.g. svr-gtw-nd1.uvrs.xyz) [$(hostname -f)]: " input_id
+  read -p "Enter Node ID (e.g. svr-gtw-nd1.uvrs.xyz) [$(hostname -f)]: " input_id < /dev/tty
   NODE_ID="${input_id:-$(hostname -f)}"
 fi
 
@@ -22,7 +22,7 @@ if [[ -z "$NODE_TYPE" ]]; then
   echo "5) server (default)"
   echo "6) service:analytics"
   echo "7) custom"
-  read -p "Choice [1-7]: " type_choice
+  read -p "Choice [1-7]: " type_choice < /dev/tty
 
   case $type_choice in
     1) NODE_TYPE="gateway" ;;
@@ -31,7 +31,7 @@ if [[ -z "$NODE_TYPE" ]]; then
     4) NODE_TYPE="server:banking" ;;
     5|"") NODE_TYPE="server" ;;
     6) NODE_TYPE="service:analytics" ;;
-    7) read -p "Enter custom node type: " custom_type; NODE_TYPE="$custom_type" ;;
+    7) read -p "Enter custom node type: " custom_type < /dev/tty; NODE_TYPE="$custom_type" ;;
     *) NODE_TYPE="server" ;;
   esac
 fi
@@ -49,15 +49,20 @@ sleep 2
 echo "Updating system & installing dependencies..."
 export DEBIAN_FRONTEND=noninteractive
 apt update -qq
-apt install -y git caddy curl jq > /dev/null
+apt install -y git curl jq > /dev/null
 
-echo "Setting up /etc/caddy directory..."
-rm -rf /etc/caddy
-mkdir -p /etc/caddy
-cd /etc/caddy
+if [[ "$NODE_TYPE" == "gateway" ]]; then
+  echo "Installing Caddy..."
+  apt install -y caddy > /dev/null
 
-echo "Cloning config repo..."
-git clone $CONFIG_REPO . || { echo "Failed to clone repo. Check SSH key!"; exit 1; }
+  echo "Setting up /etc/caddy directory..."
+  rm -rf /etc/caddy
+  mkdir -p /etc/caddy
+  cd /etc/caddy
+
+  echo "Cloning config repo..."
+  git clone $CONFIG_REPO . || { echo "Failed to clone repo. Check SSH key!"; exit 1; }
+fi
 
 echo "Installing infra-agent binary..."
 curl -sSfL "$RELEASE_URL" -o /usr/local/bin/infra-agent.NEW
@@ -91,8 +96,10 @@ SERVICE
 systemctl daemon-reload
 systemctl enable --now infra-agent
 
-echo "Reloading Caddy with your config..."
-caddy reload --config /etc/caddy/Caddyfile || echo "Warning: Caddy reload failed (will retry automatically)"
+if [[ "$NODE_TYPE" == "gateway" ]]; then
+  echo "Reloading Caddy with your config..."
+  caddy reload --config /etc/caddy/Caddyfile || echo "Warning: Caddy reload failed (will retry automatically)"
+fi
 
 echo ""
 echo "All done! Your gateway node is live."
