@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const mainFile = "cmd/gtw-agent/main.go"
+const mainFile = "cmd/infra-agent/main.go"
 
 func main() {
 	// 1. Get the last commit message
