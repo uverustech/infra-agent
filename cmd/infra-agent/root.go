@@ -17,7 +17,7 @@ var (
 		Use:   "infra-agent",
 		Short: "Infra Agent - uverustech infrastructure management",
 		Run: func(cmd *cobra.Command, args []string) {
-			agent.Run()
+			agent.Run(version)
 		},
 	}
 

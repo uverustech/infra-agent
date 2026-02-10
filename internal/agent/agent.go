@@ -27,10 +27,14 @@ var (
 	wsMu        sync.Mutex
 )
 
-func Run() {
+var (
+	currentVersion string
+)
+
+func Run(v string) {
+	currentVersion = v
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		log.Printf("Config file changed: %s. Re-applying settings...", e.Name)
-		// Logic to handle changes if needed (e.g., nodeType change)
 	})
 	viper.WatchConfig()
 
@@ -41,7 +45,7 @@ func Run() {
 		log.Fatal("node-id is required. Set it permanently with: infra-agent config set node-id <name>\nOr use --node-id once, or set INFRA_NODE_ID environment variable.")
 	}
 
-	log.Printf("infra-agent starting — node: %s", nodeID)
+	log.Printf("infra-agent %s starting — node: %s", currentVersion, nodeID)
 
 	if nodeType == "gateway" {
 		GitPull()
@@ -159,6 +163,7 @@ func connectWS() error {
 	dialer := websocket.DefaultDialer
 	conn, _, err := dialer.Dial(u, header)
 	if err != nil {
+		log.Printf("[logs] ws connection failed: %v", err)
 		return err
 	}
 	log.Printf("[logs] connected to control plane: %s", u)
@@ -218,7 +223,7 @@ func sendHeartbeat() {
 	payload := map[string]interface{}{
 		"node_id":        nodeID,
 		"git_sha":        string(bytes.TrimSpace(sha)),
-		"agent_version":  viper.GetString("version"), // We'll need to set this
+		"agent_version":  currentVersion,
 		"caddy_version":  getCaddyVersion(),
 		"last_reload_ok": heartbeatOK,
 		"last_error":     lastError,
@@ -229,16 +234,23 @@ func sendHeartbeat() {
 		"timestamp":      time.Now().UTC().Format(time.RFC3339),
 	}
 	jsonBody, _ := json.Marshal(payload)
-
-	http.Post(controlURL+"/api/heartbeat", "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(controlURL+"/api/heartbeat", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		log.Printf("[heartbeat] failed: %v", err)
+	} else {
+		if resp.StatusCode != 200 {
+			log.Printf("[heartbeat] server error: %s", resp.Status)
+		}
+		resp.Body.Close()
+	}
 
 	// Check for updates
-	resp, err := http.Get(controlURL + "/api/agent/latest-version")
+	resp, err = http.Get(controlURL + "/api/agent/latest-version")
 	if err == nil && resp.StatusCode == 200 {
+		defer resp.Body.Close()
 		var v struct {
 			Version string `json:"version"`
 		}
-		currentVersion := viper.GetString("version")
 		if json.NewDecoder(resp.Body).Decode(&v) == nil && v.Version != "" && v.Version != currentVersion {
 			tag := strings.TrimPrefix(v.Version, "v")
 			log.Printf("[update] triggering update %s → %s", currentVersion, v.Version)
