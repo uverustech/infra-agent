@@ -6,7 +6,14 @@ echo "Detecting system..."
 
 # Variables — change only these lines if needed
 CONFIG_REPO="git@github.com:uverustech/gtw-config.git"
-RELEASE_URL="https://github.com/uverustech/infra-agent/releases/latest/download/infra-agent-linux-amd64"
+# Binary download
+ARCH=$(uname -m)
+case $ARCH in
+  x86_64) BINARY="infra-agent-linux-amd64" ;;
+  aarch64) BINARY="infra-agent-linux-arm64" ;;
+  *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+esac
+RELEASE_URL="https://github.com/uverustech/infra-agent/releases/latest/download/$BINARY"
 
 if [[ -z "$NODE_ID" ]]; then
   read -p "Enter Node ID (e.g. svr-gtw-nd1.uvrs.xyz) [$(hostname -f)]: " input_id < /dev/tty
@@ -70,7 +77,7 @@ chmod +x /usr/local/bin/infra-agent.NEW
 mv /usr/local/bin/infra-agent.NEW /usr/local/bin/infra-agent
 
 echo "Running system setup..."
-/usr/local/bin/infra-agent --setup -y || echo "Warning: System setup failed"
+/usr/local/bin/infra-agent setup --yes || echo "Warning: System setup failed"
 
 systemctl restart infra-agent || true
 
@@ -82,8 +89,8 @@ After=network.target
 
 [Service]
 Type=simple
-Environment="NODE_ID=$NODE_ID"
-Environment="NODE_TYPE=$NODE_TYPE"
+Environment="INFRA_NODE_ID=$NODE_ID"
+Environment="INFRA_NODE_TYPE=$NODE_TYPE"
 ExecStart=/usr/local/bin/infra-agent
 Restart=always
 RestartSec=5
