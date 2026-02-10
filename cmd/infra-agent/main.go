@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
@@ -18,10 +19,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/nxadm/tail"
 )
 
-const version = "v1.7.0"
+const version = "v1.8.0"
 
 var (
 	nodeID      string
@@ -86,32 +86,83 @@ func main() {
 }
 
 func streamLogs() {
-	logFile := "/var/log/caddy/access.log"
-
-	// Create the log file if it doesn't exist to avoid tail error
-	if _, err := os.Stat(logFile); os.IsNotExist(err) {
-		os.MkdirAll(filepath.Dir(logFile), 0755)
-		os.WriteFile(logFile, []byte(""), 0644)
-	}
-
-	t, err := tail.TailFile(logFile, tail.Config{
-		Follow:    true,
-		ReOpen:    true,
-		MustExist: false,
-		Poll:      true, // Useful for some filesystems
-	})
+	// Root is usually needed for journalctl access
+	cmd := exec.Command("journalctl", "-f", "-o", "json", "-n", "0")
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Printf("[logs] failed to tail %s: %v", logFile, err)
+		log.Printf("[logs] failed to create stdout pipe for journalctl: %v", err)
+		// Fallback to old behavior or retry
+		time.Sleep(5 * time.Second)
+		go streamLogs()
 		return
 	}
 
-	for line := range t.Lines {
-		if line.Text == "" {
+	if err := cmd.Start(); err != nil {
+		log.Printf("[logs] failed to start journalctl: %v", err)
+		time.Sleep(5 * time.Second)
+		go streamLogs()
+		return
+	}
+
+	log.Println("[logs] started streaming from system journal")
+
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
 			continue
 		}
-		// Effortless batching could be added here, but for now we stream per line
-		sendToControl(line.Text)
+
+		var entry map[string]interface{}
+		if err := json.Unmarshal(line, &entry); err != nil {
+			continue
+		}
+
+		rawMsg, ok := entry["MESSAGE"].(string)
+		if !ok {
+			continue
+		}
+
+		// Enriched log payload
+		payload := make(map[string]interface{})
+
+		// 1. Try to parse MESSAGE as JSON (e.g. Caddy/Docker logs)
+		if err := json.Unmarshal([]byte(rawMsg), &payload); err != nil {
+			// Not JSON, just plain text
+			payload["message"] = rawMsg
+		}
+
+		// 2. Add useful journal metadata
+		if unit, ok := entry["_SYSTEMD_UNIT"].(string); ok {
+			payload["unit"] = unit
+			// If no logger/source is defined, use the unit name
+			if _, exists := payload["logger"]; !exists {
+				payload["logger"] = strings.TrimSuffix(unit, ".service")
+			}
+		}
+
+		if priority, ok := entry["PRIORITY"].(string); ok {
+			// Map syslog priority to levels
+			levels := map[string]string{
+				"0": "emergency", "1": "alert", "2": "critical", "3": "error",
+				"4": "warning", "5": "notice", "6": "info", "7": "debug",
+			}
+			if level, exists := levels[priority]; exists && payload["level"] == nil {
+				payload["level"] = level
+			}
+		}
+
+		sendToControl(payload)
 	}
+
+	if err := scanner.Err(); err != nil {
+		log.Printf("[logs] scanner error: %v", err)
+	}
+
+	cmd.Wait()
+	log.Println("[logs] journalctl exited, restarting...")
+	time.Sleep(2 * time.Second)
+	go streamLogs()
 }
 
 var (
@@ -119,7 +170,7 @@ var (
 	wsMu   sync.Mutex
 )
 
-func sendToControl(logLine string) {
+func sendToControl(logData interface{}) {
 	wsMu.Lock()
 	defer wsMu.Unlock()
 
@@ -129,7 +180,8 @@ func sendToControl(logLine string) {
 		}
 	}
 
-	err := wsConn.WriteMessage(websocket.TextMessage, []byte(logLine))
+	msgJSON, _ := json.Marshal(logData)
+	err := wsConn.WriteMessage(websocket.TextMessage, msgJSON)
 	if err != nil {
 		log.Printf("[logs] ws write error: %v, reconnecting...", err)
 		wsConn.Close()
