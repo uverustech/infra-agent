@@ -424,7 +424,6 @@ func GetStatus() (map[string]interface{}, error) {
 	nodeID := viper.GetString(config.KeyNodeID)
 	nodeType := viper.GetString(config.KeyNodeType)
 	configDir := "/etc/caddy"
-	currentVersion := viper.GetString("version")
 
 	localSha, _ := exec.Command("git", "-C", configDir, "rev-parse", "HEAD").Output()
 	localShaStr := string(bytes.TrimSpace(localSha))

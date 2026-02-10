@@ -1,6 +1,6 @@
 package main
 
-const version = "v1.9.3"
+const version = "v1.9.4"
 
 func main() {
 	Execute()

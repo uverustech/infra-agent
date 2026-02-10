@@ -43,6 +43,9 @@ infra-agent version
 # Start the agent (default action)
 infra-agent
 
+# Self-update the agent to latest
+infra-agent update
+
 # Manage configuration
 infra-agent config set node-id my-node-1
 infra-agent config get node-id

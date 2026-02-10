@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -37,10 +39,41 @@ var (
 
 	updateCmd = &cobra.Command{
 		Use:   "update",
-		Short: "Self-update the agent",
+		Short: "Self-update the agent to the latest version",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Logic to get latest tag and call agent.SelfUpdate
-			return nil
+			controlURL := viper.GetString(config.KeyControlURL)
+			resp, err := http.Get(controlURL + "/api/agent/latest-version")
+			if err != nil {
+				return fmt.Errorf("failed to check for updates: %w", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 200 {
+				return fmt.Errorf("update check failed: HTTP %d", resp.StatusCode)
+			}
+
+			var v struct {
+				Version string `json:"version"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
+				return fmt.Errorf("failed to decode response: %w", err)
+			}
+
+			if v.Version == "" {
+				return fmt.Errorf("control plane returned empty version")
+			}
+
+			// Simple normalization (remove 'v' prefix)
+			newVer := strings.TrimPrefix(v.Version, "v")
+			currVer := strings.TrimPrefix(version, "v")
+
+			if newVer == currVer {
+				fmt.Printf("Agent is already up to date (%s)\n", version)
+				return nil
+			}
+
+			fmt.Printf("Updating agent %s → %s...\n", version, v.Version)
+			return agent.SelfUpdate(newVer, viper.GetBool(config.KeyVerbose))
 		},
 	}
 
