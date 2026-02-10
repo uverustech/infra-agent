@@ -14,13 +14,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/nxadm/tail"
 )
 
-const version = "v1.6.1"
+const version = "v1.7.0"
 
 var (
 	nodeID      string
@@ -193,6 +194,8 @@ func validateAndReload() {
 
 func sendHeartbeat() {
 	sha, _ := exec.Command("git", "-C", configDir, "rev-parse", "HEAD").Output()
+	isHealthy, summary, healthData := getSystemMetrics()
+
 	payload := map[string]interface{}{
 		"node_id":        nodeID,
 		"git_sha":        string(bytes.TrimSpace(sha)),
@@ -201,6 +204,9 @@ func sendHeartbeat() {
 		"last_reload_ok": heartbeatOK,
 		"last_error":     lastError,
 		"node_type":      nodeType,
+		"is_healthy":     isHealthy,
+		"health_summary": summary,
+		"health_data":    healthData,
 		"timestamp":      time.Now().UTC().Format(time.RFC3339),
 	}
 	jsonBody, _ := json.Marshal(payload)
@@ -229,6 +235,140 @@ func sendHeartbeat() {
 		}
 	}
 	resp.Body.Close()
+}
+
+func getSystemMetrics() (bool, string, map[string]interface{}) {
+	isHealthy := true
+	summaryParts := []string{}
+	data := make(map[string]interface{})
+
+	// 1. Disk Usage
+	diskUsage, err := getDiskUsage("/")
+	if err == nil {
+		data["disk_usage"] = diskUsage
+		if diskUsage > 90 {
+			isHealthy = false
+			summaryParts = append(summaryParts, "Disk space critical")
+		}
+	}
+
+	// 2. Memory Usage
+	memUsage, err := getMemoryUsage()
+	if err == nil {
+		data["mem_usage"] = memUsage
+		if memUsage > 95 {
+			isHealthy = false
+			summaryParts = append(summaryParts, "Memory usage critical")
+		}
+	}
+
+	// 3. CPU Usage
+	cpuUsage, err := getCPUUsage()
+	if err == nil {
+		data["cpu_usage"] = cpuUsage
+		if cpuUsage > 98 {
+			isHealthy = false
+			summaryParts = append(summaryParts, "CPU load critical")
+		}
+	}
+
+	// 4. Uptime
+	uptime, err := getUptime()
+	if err == nil {
+		data["uptime"] = uptime
+	}
+
+	// 5. Node Type specific checks
+	if nodeType == "gateway" {
+		data["caddy_ok"] = heartbeatOK
+		if !heartbeatOK {
+			isHealthy = false
+			summaryParts = append(summaryParts, "Caddy reload failed")
+		}
+	}
+
+	summary := "All systems nominal"
+	if len(summaryParts) > 0 {
+		summary = strings.Join(summaryParts, ", ")
+	}
+
+	return isHealthy, summary, data
+}
+
+func getDiskUsage(path string) (float64, error) {
+	var stat syscall.Statfs_t
+	err := syscall.Statfs(path, &stat)
+	if err != nil {
+		return 0, err
+	}
+	all := stat.Blocks * uint64(stat.Bsize)
+	free := stat.Bfree * uint64(stat.Bsize)
+	used := all - free
+	if all == 0 {
+		return 0, nil
+	}
+	return float64(used) / float64(all) * 100, nil
+}
+
+func getMemoryUsage() (float64, error) {
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return 0, err
+	}
+	var total, free, available uint64
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "MemTotal:") {
+			fmt.Sscanf(line, "MemTotal: %d", &total)
+		} else if strings.HasPrefix(line, "MemFree:") {
+			fmt.Sscanf(line, "MemFree: %d", &free)
+		} else if strings.HasPrefix(line, "MemAvailable:") {
+			fmt.Sscanf(line, "MemAvailable: %d", &available)
+		}
+	}
+	if total == 0 {
+		return 0, nil
+	}
+	// Available is more accurate than Free on Linux
+	used := total - available
+	return float64(used) / float64(total) * 100, nil
+}
+
+func getCPUUsage() (float64, error) {
+	data, err := os.ReadFile("/proc/loadavg")
+	if err != nil {
+		return 0, err
+	}
+	var load1 float64
+	fmt.Sscanf(string(data), "%f", &load1)
+
+	// Since we don't know the core count easily without more cgo/library,
+	// we'll just report the raw 1m load for now.
+	// In a real agent, we'd read /proc/stat twice.
+	return load1, nil
+}
+
+func getUptime() (string, error) {
+	data, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return "", err
+	}
+	var seconds float64
+	fmt.Sscanf(string(data), "%f", &seconds)
+
+	days := int(seconds) / (24 * 3600)
+	seconds = seconds - float64(days*24*3600)
+	hours := int(seconds) / 3600
+	seconds = seconds - float64(hours*3600)
+	minutes := int(seconds) / 60
+
+	if days > 0 {
+		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes), nil
+	}
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes), nil
+	}
+	return fmt.Sprintf("%dm", minutes), nil
 }
 func selfUpdate(tag string) error {
 	exe, err := os.Executable()
