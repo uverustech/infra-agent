@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
 	"github.com/spf13/viper"
 	"github.com/uverustech/infra-agent/internal/config"
@@ -27,11 +28,17 @@ var (
 )
 
 func Run() {
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		log.Printf("Config file changed: %s. Re-applying settings...", e.Name)
+		// Logic to handle changes if needed (e.g., nodeType change)
+	})
+	viper.WatchConfig()
+
 	nodeID := viper.GetString(config.KeyNodeID)
 	nodeType := viper.GetString(config.KeyNodeType)
 
 	if nodeID == "" {
-		log.Fatal("node-id is required. Use --node-id, INFRA_NODE_ID env var, or config file.")
+		log.Fatal("node-id is required. Set it permanently with: infra-agent config set node-id <name>\nOr use --node-id once, or set INFRA_NODE_ID environment variable.")
 	}
 
 	log.Printf("infra-agent starting — node: %s", nodeID)
@@ -46,7 +53,9 @@ func Run() {
 
 	ticker := time.NewTicker(10 * time.Second)
 	for range ticker.C {
-		if nodeType == "gateway" {
+		// Dynamic check: node type might have changed in config
+		currNodeType := viper.GetString(config.KeyNodeType)
+		if currNodeType == "gateway" && viper.GetBool(config.KeyAutoPull) {
 			GitPull()
 			ValidateAndReload()
 		}
@@ -397,4 +406,35 @@ func GetLatestVersion(controlURL, currentVersion string) (string, error) {
 		return "", err
 	}
 	return payload.Version, nil
+}
+
+func GetStatus() (map[string]interface{}, error) {
+	nodeID := viper.GetString(config.KeyNodeID)
+	nodeType := viper.GetString(config.KeyNodeType)
+	configDir := "/etc/caddy"
+	currentVersion := viper.GetString("version")
+
+	localSha, _ := exec.Command("git", "-C", configDir, "rev-parse", "HEAD").Output()
+	localShaStr := string(bytes.TrimSpace(localSha))
+
+	// Get remote SHA (ls-remote is fast and doesn't pull)
+	remoteShaStr := "unknown"
+	remoteCmd := exec.Command("git", "-C", configDir, "ls-remote", "origin", "HEAD")
+	if out, err := remoteCmd.CombinedOutput(); err == nil {
+		parts := strings.Fields(string(out))
+		if len(parts) > 0 {
+			remoteShaStr = parts[0]
+		}
+	} else {
+		log.Printf("[status] failed to get remote sha: %v\n%s", err, string(out))
+	}
+
+	return map[string]interface{}{
+		"node_id":        nodeID,
+		"node_type":      nodeType,
+		"agent_version":  currentVersion,
+		"local_git_sha":  localShaStr,
+		"remote_git_sha": remoteShaStr,
+		"drift":          localShaStr != remoteShaStr && remoteShaStr != "unknown",
+	}, nil
 }

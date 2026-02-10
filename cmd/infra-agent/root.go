@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -46,6 +47,31 @@ var (
 	configCmd = &cobra.Command{
 		Use:   "config",
 		Short: "Manage configuration",
+		Run: func(cmd *cobra.Command, args []string) {
+			settings := viper.AllSettings()
+			if len(settings) == 0 {
+				fmt.Println("No configuration found.")
+				return
+			}
+			fmt.Println("Current Configuration (Precedence: Flag > Env > Config > Default):")
+			for k, v := range settings {
+				source := "Default"
+				if viper.InConfig(k) {
+					source = "Config File"
+				}
+				if cmd.Flags().Changed(k) {
+					source = "Flag"
+				}
+				// Check env? Viper doesn't make it easy to see if it came from env specifically
+
+				if strings.Contains(k, "token") {
+					fmt.Printf("  %-15s: %-20s (%s)\n", k, config.MaskSecret(fmt.Sprintf("%v", v)), source)
+				} else {
+					fmt.Printf("  %-15s: %-20s (%s)\n", k, v, source)
+				}
+			}
+			fmt.Printf("\nConfig file used: %s\n", viper.ConfigFileUsed())
+		},
 	}
 
 	configSetCmd = &cobra.Command{
@@ -87,6 +113,28 @@ var (
 			agent.ValidateAndReload()
 		},
 	}
+
+	statusCmd = &cobra.Command{
+		Use:   "status",
+		Short: "Show gateway status and drift information",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			status, err := agent.GetStatus()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Node ID:        %s\n", status["node_id"])
+			fmt.Printf("Node Type:      %s\n", status["node_type"])
+			fmt.Printf("Agent Version:  %s\n", status["agent_version"])
+			fmt.Printf("Local Git SHA:  %s\n", status["local_git_sha"])
+			fmt.Printf("Remote Git SHA: %s\n", status["remote_git_sha"])
+			if status["drift"].(bool) {
+				fmt.Println("Status:         DRAINED (Drift detected! Run 'gateway pull' to sync)")
+			} else {
+				fmt.Println("Status:         HEALTHY (Up to date)")
+			}
+			return nil
+		},
+	}
 )
 
 func init() {
@@ -112,6 +160,7 @@ func init() {
 	configCmd.AddCommand(configGetCmd)
 	gatewayCmd.AddCommand(gatewayPullCmd)
 	gatewayCmd.AddCommand(gatewayReloadCmd)
+	gatewayCmd.AddCommand(statusCmd)
 
 	// Add setup subcommands
 	for _, step := range setup.Steps {

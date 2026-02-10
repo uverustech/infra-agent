@@ -50,6 +50,9 @@ infra-agent config get node-id
 
 ### Gateway Actions
 ```bash
+# Show gateway status and drift (local vs remote commit)
+infra-agent gateway status
+
 # Pull latest Caddy config
 infra-agent gateway pull
 
@@ -75,6 +78,7 @@ Configuration can be managed via flags, environment variables (prefix `INFRA_`),
 |-----|------|---------|---------|
 | `node-id` | `-i`, `--node-id` | `INFRA_NODE_ID` | (none) |
 | `node-type` | `-t`, `--node-type` | `INFRA_NODE_TYPE` | `server` |
+| `auto-pull` | - | `INFRA_AUTO_PULL` | `true` |
 | `control-url` | - | `INFRA_CONTROL_URL` | `https://control.uvrs.xyz` |
 | `github-token` | - | `INFRA_GITHUB_TOKEN` | (none) |
 

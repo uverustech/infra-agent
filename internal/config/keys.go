@@ -8,4 +8,5 @@ const (
 	KeySSHKeyURL   = "ssh-key-url"
 	KeyVerbose     = "verbose"
 	KeyAutoConfirm = "yes"
+	KeyAutoPull    = "auto-pull"
 )
