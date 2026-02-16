@@ -46,7 +46,7 @@ The agent checks for new versions during each heartbeat. If a newer version is a
 ### `setup`
 Runs the system-level setup tasks required to bootstrap a node. Running `setup` without subcommands executes all steps.
 
-- **`setup ssh`**: Installs administrative SSH public keys.
+- **`setup ssh`**: Installs administrative SSH public keys (`uvr-ops` and `uvr-root`).
 - **`setup hardening`**: Runs the full system hardening sequence (see below).
 - **`setup packages`**: *Placeholder* - Installs system packages.
 - **`setup timezone`**: *Placeholder* - Configures system timezone.

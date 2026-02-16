@@ -16,25 +16,21 @@ import (
 
 func RunSSH(cmd *cobra.Command, args []string) error {
 	githubToken := viper.GetString(config.KeyGithubToken)
-	sshKeyURL := viper.GetString(config.KeySSHKeyURL)
 	autoConfirm := viper.GetBool(config.KeyAutoConfirm)
 
 	if githubToken == "" {
 		return fmt.Errorf("GitHub token is required for SSH setup. Set --github-token or GITHUB_TOKEN env var")
 	}
 
-	fmt.Printf("Fetching SSH public key from: %s\n", sshKeyURL)
-	pubKey, err := fetchGithubFile(sshKeyURL, githubToken)
-	if err != nil {
-		return fmt.Errorf("failed to fetch SSH key: %w", err)
+	keysToFetch := []string{
+		viper.GetString(config.KeySSHKeyURL),
+		"https://github.com/uverustech/secrets/ssh-keys/uvr-root/uvr_root.pub",
 	}
-	pubKey = strings.TrimSpace(pubKey)
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("could not determine home directory: %w", err)
 	}
-
 	sshDir := filepath.Join(homeDir, ".ssh")
 	authKeysFile := filepath.Join(sshDir, "authorized_keys")
 
@@ -50,25 +46,36 @@ func RunSSH(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	content, _ := os.ReadFile(authKeysFile)
-	if strings.Contains(string(content), pubKey) {
-		fmt.Println("SSH key already exists in authorized_keys. Skipping")
-		return nil
-	}
-
-	if confirmAction(fmt.Sprintf("Add SSH key to %s?", authKeysFile), autoConfirm) {
-		f, err := os.OpenFile(authKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	for _, url := range keysToFetch {
+		fmt.Printf("Fetching SSH public key from: %s\n", url)
+		pubKey, err := fetchGithubFile(url, githubToken)
 		if err != nil {
-			return fmt.Errorf("failed to open %s: %w", authKeysFile, err)
+			fmt.Printf("Warning: failed to fetch SSH key from %s: %v\n", url, err)
+			continue
 		}
-		defer f.Close()
+		pubKey = strings.TrimSpace(pubKey)
 
-		if _, err := f.WriteString("\n" + pubKey + "\n"); err != nil {
-			return fmt.Errorf("failed to write to %s: %w", authKeysFile, err)
+		content, _ := os.ReadFile(authKeysFile)
+		if strings.Contains(string(content), pubKey) {
+			fmt.Printf("SSH key from %s already exists in authorized_keys. Skipping\n", url)
+			continue
 		}
-		fmt.Printf("Successfully added SSH key to %s\n", authKeysFile)
-	} else {
-		fmt.Println("Skipping SSH key installation")
+
+		if confirmAction(fmt.Sprintf("Add SSH key from %s to %s?", url, authKeysFile), autoConfirm) {
+			f, err := os.OpenFile(authKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+			if err != nil {
+				return fmt.Errorf("failed to open %s: %w", authKeysFile, err)
+			}
+
+			if _, err := f.WriteString("\n" + pubKey + "\n"); err != nil {
+				f.Close()
+				return fmt.Errorf("failed to write to %s: %w", authKeysFile, err)
+			}
+			f.Close()
+			fmt.Printf("Successfully added SSH key from %s\n", url)
+		} else {
+			fmt.Printf("Skipping SSH key from %s\n", url)
+		}
 	}
 
 	return nil
