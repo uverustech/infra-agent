@@ -23,22 +23,24 @@ fi
 if [[ -z "$NODE_TYPE" ]]; then
   echo "Select Node Type:"
   echo "1) gateway"
-  echo "2) server:build"
-  echo "3) server:applications"
+  echo "2) server:application"
+  echo "3) server:static"
   echo "4) server:banking"
-  echo "5) server (default)"
-  echo "6) service:analytics"
-  echo "7) custom"
-  read -p "Choice [1-7]: " type_choice < /dev/tty
+  echo "5) server:build"
+  echo "6) server:analytics"
+  echo "7) server (default)"
+  echo "8) custom"
+  read -p "Choice [1-8]: " type_choice < /dev/tty
 
   case $type_choice in
     1) NODE_TYPE="gateway" ;;
-    2) NODE_TYPE="server:build" ;;
-    3) NODE_TYPE="server:applications" ;;
+    2) NODE_TYPE="server:application" ;;
+    3) NODE_TYPE="server:static" ;;
     4) NODE_TYPE="server:banking" ;;
-    5|"") NODE_TYPE="server" ;;
-    6) NODE_TYPE="service:analytics" ;;
-    7) read -p "Enter custom node type: " custom_type < /dev/tty; NODE_TYPE="$custom_type" ;;
+    5) NODE_TYPE="server:build" ;;
+    6) NODE_TYPE="server:analytics" ;;
+    7|"") NODE_TYPE="server" ;;
+    8) read -p "Enter custom node type: " custom_type < /dev/tty; NODE_TYPE="$custom_type" ;;
     *) NODE_TYPE="server" ;;
   esac
 fi
@@ -75,6 +77,10 @@ echo "Installing infra-agent binary..."
 curl -sSfL "$RELEASE_URL" -o /usr/local/bin/infra-agent.NEW
 chmod +x /usr/local/bin/infra-agent.NEW
 mv /usr/local/bin/infra-agent.NEW /usr/local/bin/infra-agent
+
+echo "Persisting configuration..."
+/usr/local/bin/infra-agent config set node-id "$NODE_ID"
+/usr/local/bin/infra-agent config set node-type "$NODE_TYPE"
 
 echo "Running system setup..."
 export INFRA_NODE_ID="$NODE_ID"
