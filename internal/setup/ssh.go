@@ -121,14 +121,3 @@ func fetchGithubFile(urlStr, token string) (string, error) {
 
 	return string(content), nil
 }
-
-func confirmAction(message string, autoConfirm bool) bool {
-	if autoConfirm {
-		return true
-	}
-
-	fmt.Printf("%s (y/n): ", message)
-	var response string
-	fmt.Scanln(&response)
-	return strings.ToLower(strings.TrimSpace(response)) == "y"
-}

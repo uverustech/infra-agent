@@ -77,6 +77,8 @@ chmod +x /usr/local/bin/infra-agent.NEW
 mv /usr/local/bin/infra-agent.NEW /usr/local/bin/infra-agent
 
 echo "Running system setup..."
+export INFRA_NODE_ID="$NODE_ID"
+export INFRA_NODE_TYPE="$NODE_TYPE"
 /usr/local/bin/infra-agent setup --yes || echo "Warning: System setup failed"
 
 systemctl restart infra-agent || true

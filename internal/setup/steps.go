@@ -10,6 +10,7 @@ type Step struct {
 var Steps = []Step{
 	{Name: "ssh", Run: RunSSH},
 	{Name: "hardening", Run: RunHardening},
+	{Name: "hostname", Run: RunHostname},
 	{Name: "packages", Run: RunPackages},
 	{Name: "timezone", Run: RunTimezone},
 }

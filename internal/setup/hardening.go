@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"github.com/uverustech/infra-agent/internal/config"
 )
 
 func RunHardening(cmd *cobra.Command, args []string) error {
@@ -195,21 +193,6 @@ func RunVerifyHardening(cmd *cobra.Command, args []string) error {
 }
 
 // Helpers
-
-func isPackageInstalled(pkg string) bool {
-	err := exec.Command("dpkg", "-l", pkg).Run()
-	return err == nil
-}
-
-func runCmd(name string, args ...string) error {
-	if viper.GetBool(config.KeyVerbose) {
-		fmt.Printf("Running: %s %s\n", name, strings.Join(args, " "))
-	}
-	cmd := exec.Command(name, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
 
 func checkStatus(label string, name string, args ...string) {
 	err := exec.Command(name, args...).Run()
