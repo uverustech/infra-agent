@@ -44,19 +44,33 @@ The agent checks for new versions during each heartbeat. If a newer version is a
 ## Command Reference
 
 ### `setup`
-Runs the system-level setup tasks required to bootstrap a node. Running `setup` without subcommands executes all steps sequentially.
+Runs the system-level setup tasks required to bootstrap a node. Running `setup` without subcommands executes all steps.
 
-#### Subcommands:
 - **`setup ssh`**: Installs administrative SSH public keys.
-    - Fetches the public key from a private GitHub repository using the `github-token`.
-    - Creates `~/.ssh` with `0700` permissions if it doesn't exist.
-    - Appends the key to `~/.ssh/authorized_keys` with `0600` permissions.
-    - Prevents duplicate entries by checking if the key already exists.
-- **`setup hardening`**: *Internal Placeholder* - Intended for applying OS security hardening (e.g., SSH config, firewall).
-- **`setup packages`**: *Internal Placeholder* - Intended for installing required system dependencies via the package manager.
-- **`setup timezone`**: *Internal Placeholder* - Intended for configuring the system timezone.
+- **`setup hardening`**: Runs the full system hardening sequence (see below).
+- **`setup packages`**: *Placeholder* - Installs system packages.
+- **`setup timezone`**: *Placeholder* - Configures system timezone.
 
-All setup actions (except those with `--yes`) will prompt for confirmation before making changes to the system.
+---
+
+### `setup hardening`
+Secures the node by applying a sequence of hardening steps.
+
+#### Actions (Run in sequence when using `setup hardening`):
+1.  **`ensure-openssh-server`**: Ensures OpenSSH server is installed, enabled, and running.
+2.  **`setup-ssh-keys`**: Adds administrative public keys to `~/.ssh/authorized_keys` with correct permissions.
+3.  **`disable-ssh-password-and-pam`**: Enforces key-only authentication and disables password/PAM in `/etc/ssh/sshd_config.d/99-infra-hardening.conf`.
+4.  **`install-and-configure-ufw`**: Sets up a deny-by-default firewall, allowing only OpenSSH by default.
+5.  **`install-and-configure-fail2ban`**: Installs Fail2Ban with an aggressive SSH jail to block brute-force attempts.
+6.  **`verify-hardening-status`**: Performs a final check and reports the hardening status (UFW, SSH settings, Fail2Ban).
+
+#### Subcommands (Run specific steps):
+- **`setup hardening ssh`**: Only runs Step 3 (Disable password/pam).
+- **`setup hardening ufw`**: Only runs Step 4 (Configure UFW).
+- **`setup hardening fail2ban`**: Only runs Step 5 (Configure Fail2Ban).
+- **`setup hardening status`**: Only runs Step 6 (Verify status).
+
+All setup actions (except those with `--yes`) will prompt for confirmation.
 
 ### `config`
 Manages the agent's persistent configuration.

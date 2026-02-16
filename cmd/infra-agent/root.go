@@ -204,6 +204,29 @@ func init() {
 			RunE:  stepCopy.Run,
 		}
 		setupCmd.AddCommand(sub)
+
+		if stepCopy.Name == "hardening" {
+			sub.AddCommand(&cobra.Command{
+				Use:   "ssh",
+				Short: "Disable SSH password and PAM",
+				RunE:  setup.RunDisableSSHPasswordAndPAM,
+			})
+			sub.AddCommand(&cobra.Command{
+				Use:   "ufw",
+				Short: "Install and configure UFW",
+				RunE:  setup.RunConfigureUFW,
+			})
+			sub.AddCommand(&cobra.Command{
+				Use:   "fail2ban",
+				Short: "Install and configure Fail2Ban",
+				RunE:  setup.RunConfigureFail2Ban,
+			})
+			sub.AddCommand(&cobra.Command{
+				Use:   "status",
+				Short: "Verify hardening status",
+				RunE:  setup.RunVerifyHardening,
+			})
+		}
 	}
 }
 
