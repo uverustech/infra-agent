@@ -63,6 +63,7 @@ func RunDisableSSHPasswordAndPAM(cmd *cobra.Command, args []string) error {
 	confPath := "/etc/ssh/sshd_config.d/99-infra-hardening.conf"
 	confContent := `PasswordAuthentication no
 ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
 UsePAM no
 PermitRootLogin prohibit-password
 PubkeyAuthentication yes
@@ -91,12 +92,19 @@ PubkeyAuthentication yes
 	if err != nil {
 		return fmt.Errorf("failed to run sshd -T: %w", err)
 	}
-	settings := string(out)
-	checks := []string{"passwordauthentication no", "usepam no", "challengeresponseauthentication no"}
-	for _, check := range checks {
-		if !strings.Contains(strings.ToLower(settings), check) {
-			return fmt.Errorf("verification failed: %s not found in sshd -T", check)
-		}
+	settings := strings.ToLower(string(out))
+
+	// Basic checks
+	if !strings.Contains(settings, "passwordauthentication no") {
+		return fmt.Errorf("verification failed: passwordauthentication no not found in sshd -T")
+	}
+	if !strings.Contains(settings, "usepam no") {
+		return fmt.Errorf("verification failed: usepam no not found in sshd -T")
+	}
+
+	// ChallengeResponse / KbdInteractive check (aliases)
+	if !strings.Contains(settings, "challengeresponseauthentication no") && !strings.Contains(settings, "kbdinteractiveauthentication no") {
+		return fmt.Errorf("verification failed: neither challengeresponseauthentication nor kbdinteractiveauthentication was disabled in sshd -T")
 	}
 
 	fmt.Println("✓ SSH Password and PAM disabled")
