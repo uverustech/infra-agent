@@ -164,8 +164,8 @@ ignoreip = 127.0.0.1/8 ::1
 		return err
 	}
 
-	fmt.Println("Reloading fail2ban...")
-	if err := runCmd("fail2ban-client", "reload"); err != nil {
+	fmt.Println("Restarting fail2ban to apply changes...")
+	if err := runCmd("systemctl", "restart", "fail2ban"); err != nil {
 		return err
 	}
 
