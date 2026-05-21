@@ -67,10 +67,9 @@ func SelfUpdate(tag string, verbose bool) error {
 	}
 
 	log.Printf("[update] successfully replaced binary → restarting service")
-	// Using systemctl restart is best for systemd-managed services
 	go func() {
 		time.Sleep(1 * time.Second)
-		if err := exec.Command("sudo", "systemctl", "restart", "infra-agent").Run(); err != nil {
+		if err := exec.Command("systemctl", "restart", "infra-agent").Run(); err != nil {
 			log.Printf("[update] failed to restart service via systemctl: %v (trying to exit instead)", err)
 			os.Exit(0)
 		}

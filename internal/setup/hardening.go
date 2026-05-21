@@ -120,9 +120,15 @@ func RunConfigureUFW(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("Configuring UFW...")
-	runCmd("ufw", "default", "deny", "incoming")
-	runCmd("ufw", "default", "allow", "outgoing")
-	runCmd("ufw", "allow", "OpenSSH")
+	if err := runCmd("ufw", "default", "deny", "incoming"); err != nil {
+		return fmt.Errorf("ufw default deny incoming: %w", err)
+	}
+	if err := runCmd("ufw", "default", "allow", "outgoing"); err != nil {
+		return fmt.Errorf("ufw default allow outgoing: %w", err)
+	}
+	if err := runCmd("ufw", "allow", "OpenSSH"); err != nil {
+		return fmt.Errorf("ufw allow OpenSSH: %w", err)
+	}
 
 	fmt.Println("Enabling UFW...")
 	if err := runCmd("ufw", "--force", "enable"); err != nil {
