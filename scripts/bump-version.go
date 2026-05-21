@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	re := regexp.MustCompile(`const version = "v(\d+)\.(\d+)\.(\d+)"`)
+	re := regexp.MustCompile(`var version = "v(\d+)\.(\d+)\.(\d+)"`)
 	matches := re.FindStringSubmatch(string(content))
 	if len(matches) != 4 {
 		fmt.Println("Could not find version string in main.go")
@@ -64,7 +64,7 @@ func main() {
 	fmt.Printf("Bumping version from v%s.%s.%s to %s\n", matches[1], matches[2], matches[3], newVersion)
 
 	// 4. Update file
-	newContent := re.ReplaceAllString(string(content), fmt.Sprintf(`const version = "%s"`, newVersion))
+	newContent := re.ReplaceAllString(string(content), fmt.Sprintf(`var version = "%s"`, newVersion))
 	err = os.WriteFile(mainFile, []byte(newContent), 0644)
 	if err != nil {
 		fmt.Printf("Error writing file: %v\n", err)
