@@ -1,6 +1,7 @@
 package main
 
-const version = "v1.11.5"
+// version is injected at build time via -ldflags "-X main.version=vX.Y.Z".
+var version = "dev"
 
 func main() {
 	Execute()

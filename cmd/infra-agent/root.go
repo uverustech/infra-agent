@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
@@ -42,37 +40,22 @@ var (
 		Short: "Self-update the agent to the latest version",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			controlURL := viper.GetString(config.KeyControlURL)
-			resp, err := http.Get(controlURL + "/api/agent/latest-version")
+			latest, err := agent.GetLatestVersion(controlURL)
 			if err != nil {
 				return fmt.Errorf("failed to check for updates: %w", err)
 			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode != 200 {
-				return fmt.Errorf("update check failed: HTTP %d", resp.StatusCode)
-			}
-
-			var v struct {
-				Version string `json:"version"`
-			}
-			if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
-				return fmt.Errorf("failed to decode response: %w", err)
-			}
-
-			if v.Version == "" {
+			if latest == "" {
 				return fmt.Errorf("control plane returned empty version")
 			}
 
-			// Simple normalization (remove 'v' prefix)
-			newVer := strings.TrimPrefix(v.Version, "v")
+			newVer := strings.TrimPrefix(latest, "v")
 			currVer := strings.TrimPrefix(version, "v")
-
 			if newVer == currVer {
 				fmt.Printf("Agent is already up to date (%s)\n", version)
 				return nil
 			}
 
-			fmt.Printf("Updating agent %s → %s...\n", version, v.Version)
+			fmt.Printf("Updating agent %s → %s...\n", version, latest)
 			return agent.SelfUpdate(newVer, viper.GetBool(config.KeyVerbose))
 		},
 	}
@@ -95,8 +78,6 @@ var (
 				if cmd.Flags().Changed(k) {
 					source = "Flag"
 				}
-				// Check env? Viper doesn't make it easy to see if it came from env specifically
-
 				if strings.Contains(k, "token") {
 					fmt.Printf("  %-15s: %-20s (%s)\n", k, config.MaskSecret(fmt.Sprintf("%v", v)), source)
 				} else {
@@ -133,7 +114,7 @@ var (
 
 	gatewayPullCmd = &cobra.Command{
 		Use:   "pull",
-		Short: "Pull latest geometry config",
+		Short: "Pull latest gateway config",
 		Run: func(cmd *cobra.Command, args []string) {
 			agent.GitPull()
 		},
@@ -142,8 +123,13 @@ var (
 	gatewayReloadCmd = &cobra.Command{
 		Use:   "reload",
 		Short: "Validate and reload Caddy",
-		Run: func(cmd *cobra.Command, args []string) {
-			agent.ValidateAndReload()
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ok, errMsg := agent.ValidateAndReload()
+			if !ok {
+				return fmt.Errorf("caddy reload failed:\n%s", errMsg)
+			}
+			fmt.Println("Caddy reloaded successfully")
+			return nil
 		},
 	}
 
@@ -157,10 +143,10 @@ var (
 			}
 			fmt.Printf("Node ID:        %s\n", status["node_id"])
 			fmt.Printf("Node Type:      %s\n", status["node_type"])
-			fmt.Printf("Agent Version:  %s\n", status["agent_version"])
+			fmt.Printf("Agent Version:  %s\n", version)
 			fmt.Printf("Local Git SHA:  %s\n", status["local_git_sha"])
 			fmt.Printf("Remote Git SHA: %s\n", status["remote_git_sha"])
-			if status["drift"].(bool) {
+			if drift, ok := status["drift"].(bool); ok && drift {
 				fmt.Println("Status:         DRAINED (Drift detected! Run 'gateway pull' to sync)")
 			} else {
 				fmt.Println("Status:         HEALTHY (Up to date)")
@@ -195,9 +181,8 @@ func init() {
 	gatewayCmd.AddCommand(gatewayReloadCmd)
 	gatewayCmd.AddCommand(statusCmd)
 
-	// Add setup subcommands
 	for _, step := range setup.Steps {
-		stepCopy := step // capture loop var
+		stepCopy := step
 		sub := &cobra.Command{
 			Use:   stepCopy.Name,
 			Short: fmt.Sprintf("Run %s setup step", stepCopy.Name),
