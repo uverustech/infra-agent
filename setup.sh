@@ -77,6 +77,7 @@ echo "Installing infra-agent binary..."
 curl -sSfL "$RELEASE_URL" -o /usr/local/bin/infra-agent.NEW
 chmod +x /usr/local/bin/infra-agent.NEW
 mv /usr/local/bin/infra-agent.NEW /usr/local/bin/infra-agent
+ln -sf /usr/local/bin/infra-agent /usr/local/bin/uvra
 
 echo "Persisting configuration..."
 /usr/local/bin/infra-agent config set node-id "$NODE_ID"
@@ -117,8 +118,9 @@ if [[ "$NODE_TYPE" == "gateway" ]]; then
 fi
 
 echo ""
-echo "All done! Your gateway node is live."
-echo "Node ID: $NODE_ID"
-echo "Health check: http://$NODE_ID/health → should return OK"
-echo "DNS can now point to this IP"
+echo "All done! Node $NODE_ID is live."
+if [[ "$NODE_TYPE" == "gateway" ]]; then
+  echo "Health check: http://$NODE_ID/health → should return OK"
+  echo "DNS can now point to this IP"
+fi
 echo ""
