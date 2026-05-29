@@ -82,7 +82,7 @@ Configuration can be managed via flags, environment variables (prefix `INFRA_`),
 | `node-id` | `-i`, `--node-id` | `INFRA_NODE_ID` | (none) |
 | `node-type` | `-t`, `--node-type` | `INFRA_NODE_TYPE` | `server` |
 | `auto-pull` | - | `INFRA_AUTO_PULL` | `true` |
-| `control-url` | - | `INFRA_CONTROL_URL` | `https://command.uvrs.xyz/api` |
+| `control-url` | - | `INFRA_CONTROL_URL` | `https://command.uvrs.xyz` |
 | `github-token` | - | `INFRA_GITHUB_TOKEN` | (none) |
 
 ## Build and Developer tools
