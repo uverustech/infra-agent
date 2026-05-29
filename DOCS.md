@@ -99,7 +99,7 @@ Displays the current version of the `infra-agent`.
 | :--- | :--- | :--- | :--- |
 | `node-id` | `INFRA_NODE_ID` | (required) | Unique identifier for the node. |
 | `node-type` | `INFRA_NODE_TYPE` | `server` | Either `gateway` or `server`. |
-| `control-url` | `INFRA_CONTROL_URL` | `https://control.uvrs.xyz` | URL of the Control Plane. |
+| `control-url` | `INFRA_CONTROL_URL` | `https://command.uvrs.xyz/api` | URL of the Control Plane. |
 | `github-token` | `INFRA_GITHUB_TOKEN` | - | Token used to fetch private SSH keys and configs. |
 | `ssh-key-url` | `INFRA_SSH_KEY_URL` | (internal) | URL to the public SSH keys file. |
 | `auto-pull` | `INFRA_AUTO_PULL` | `true` | Whether to automatically sync git configs on gateways. |

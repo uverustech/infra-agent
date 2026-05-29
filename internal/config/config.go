@@ -15,7 +15,7 @@ func Init() {
 	viper.AutomaticEnv()
 
 	// Default values
-	viper.SetDefault(KeyControlURL, "https://control.uvrs.xyz")
+	viper.SetDefault(KeyControlURL, "https://command.uvrs.xyz/api")
 	viper.SetDefault(KeyNodeType, "server")
 	viper.SetDefault(KeySSHKeyURL, "https://github.com/uverustech/secrets/ssh-keys/uvr-ops/uvr_ops.pub")
 	viper.SetDefault(KeyAutoPull, true)
